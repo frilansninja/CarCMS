@@ -1,0 +1,50 @@
+# Maven build output
+target/
+*.jar
+*.war
+*.ear
+
+# Node modules and frontend build output
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test output
+*.class
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
+
+# Environment files (should be set via docker-compose)
+.env
+.env.local

@@ -1,0 +1,58 @@
+cms-backend  | 
+cms-backend  |   .   ____          _            __ _ _
+cms-backend  |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+cms-backend  | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+cms-backend  |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+cms-backend  |   '  |____| .__|_| |_|_| |_\__, | / / / /
+cms-backend  |  =========|_|==============|___/=/_/_/_/
+cms-backend  |  :: Spring Boot ::                (v3.2.2)
+cms-backend  | 
+cms-backend  | 2025-12-29T11:29:44.147Z  INFO 7 --- [           main] se.meltastudio.cms.Application           : Starting Application v0.0.1-SNAPSHOT using Java 21.0.9 with PID 7 (/app/app.jar started by root in /app)
+cms-backend  | 2025-12-29T11:29:44.149Z  INFO 7 --- [           main] se.meltastudio.cms.Application           : The following 1 profile is active: "prod"
+cms-backend  | 2025-12-29T11:29:44.710Z  INFO 7 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+cms-backend  | 2025-12-29T11:29:44.772Z  INFO 7 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 57 ms. Found 25 JPA repository interfaces.
+cms-backend  | 2025-12-29T11:29:45.126Z  INFO 7 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+cms-backend  | 2025-12-29T11:29:45.133Z  INFO 7 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+cms-backend  | 2025-12-29T11:29:45.134Z  INFO 7 --- [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.18]
+cms-backend  | 2025-12-29T11:29:45.153Z  INFO 7 --- [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+cms-backend  | 2025-12-29T11:29:45.154Z  INFO 7 --- [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 951 ms
+cms-backend  | 2025-12-29T11:29:45.229Z  INFO 7 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+cms-backend  | 2025-12-29T11:29:45.289Z  INFO 7 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.mariadb.jdbc.Connection@6ffd4c0d
+cms-backend  | 2025-12-29T11:29:45.290Z  INFO 7 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+cms-backend  | 2025-12-29T11:29:45.344Z  INFO 7 --- [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+cms-backend  | 2025-12-29T11:29:45.381Z  INFO 7 --- [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.4.1.Final
+cms-backend  | 2025-12-29T11:29:45.412Z  INFO 7 --- [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+cms-backend  | 2025-12-29T11:29:45.559Z  INFO 7 --- [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+cms-backend  | 2025-12-29T11:29:46.367Z  INFO 7 --- [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+cms-backend  | 2025-12-29T11:29:46.434Z  INFO 7 --- [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+cms-backend  | 2025-12-29T11:29:46.604Z  INFO 7 --- [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+cms-backend  | 2025-12-29T11:29:47.440Z  WARN 7 --- [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+cms-backend  | 2025-12-29T11:29:47.495Z  INFO 7 --- [           main] o.s.b.a.w.s.WelcomePageHandlerMapping    : Adding welcome page: class path resource [static/index.html]
+cms-backend  | 2025-12-29T11:29:47.607Z  INFO 7 --- [           main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@1d243ebb, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@5de898de, org.springframework.security.web.context.SecurityContextHolderFilter@1749ed56, org.springframework.security.web.header.HeaderWriterFilter@639517ac, org.springframework.web.filter.CorsFilter@5c5295e4, org.springframework.security.web.authentication.logout.LogoutFilter@7794926, se.meltastudio.cms.security.JwtRequestFilter@2810618f, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@215f65af, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@63c4f778, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@382ca51d, org.springframework.security.web.access.ExceptionTranslationFilter@2dfa0bff, org.springframework.security.web.access.intercept.AuthorizationFilter@12d26d3a]
+cms-backend  | 2025-12-29T11:29:47.771Z  INFO 7 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path ''
+cms-backend  | 2025-12-29T11:29:47.783Z  INFO 7 --- [           main] se.meltastudio.cms.Application           : Started Application in 3.959 seconds (process running for 4.372)
+cms-backend  | 2025-12-29T11:56:15.492Z  INFO 7 --- [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+cms-backend  | 2025-12-29T11:56:15.492Z  INFO 7 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+cms-backend  | 2025-12-29T11:56:15.493Z  INFO 7 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+cms-backend  | Intercepted request: /api/companies/1/users
+cms-backend  | Authorization Header: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbkBtZWx0YS1zdHVkaW9zLnNlIiwicm9sZXMiOlsiUk9MRV9TVVBFUl9BRE1JTiJdLCJjb21wYW55SWQiOjEsImlhdCI6MTc2NzAwNzI1MiwiZXhwIjoxNzY3MDA4MTUyfQ.qxxBsSzwRCZPjp7UNtvWisFd1h3xnQAYaka82qcz3f4
+cms-backend  | Extracted JWT Token: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbkBtZWx0YS1zdHVkaW9zLnNlIiwicm9sZXMiOlsiUk9MRV9TVVBFUl9BRE1JTiJdLCJjb21wYW55SWQiOjEsImlhdCI6MTc2NzAwNzI1MiwiZXhwIjoxNzY3MDA4MTUyfQ.qxxBsSzwRCZPjp7UNtvWisFd1h3xnQAYaka82qcz3f4
+cms-backend  | Intercepted request: /api/auth/refresh
+cms-backend  | Authorization Header: null
+cms-backend  | Intercepted request: /api/auth/refresh
+cms-backend  | Authorization Header: null
+cms-backend  | No JWT token found, skipping authentication for this request.
+cms-backend  | No JWT token found, skipping authentication for this request.
+cms-backend  | JWT validation failed: JWT signature does not match locally computed signature. JWT validity cannot be asserted and should not be trusted.
+cms-backend  | Intercepted request: /api/companies/1/users
+cms-backend  | Authorization Header: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbkBtZWx0YS1zdHVkaW9zLnNlIiwicm9sZXMiOlsiUk9MRV9TVVBFUl9BRE1JTiJdLCJjb21wYW55SWQiOjEsImlhdCI6MTc2NzAwNzI1MiwiZXhwIjoxNzY3MDA4MTUyfQ.qxxBsSzwRCZPjp7UNtvWisFd1h3xnQAYaka82qcz3f4
+cms-backend  | Extracted JWT Token: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbkBtZWx0YS1zdHVkaW9zLnNlIiwicm9sZXMiOlsiUk9MRV9TVVBFUl9BRE1JTiJdLCJjb21wYW55SWQiOjEsImlhdCI6MTc2NzAwNzI1MiwiZXhwIjoxNzY3MDA4MTUyfQ.qxxBsSzwRCZPjp7UNtvWisFd1h3xnQAYaka82qcz3f4
+cms-backend  | JWT validation failed: JWT signature does not match locally computed signature. JWT validity cannot be asserted and should not be trusted.
+cms-backend  | Intercepted request: /api/companies
+cms-backend  | Authorization Header: Bearer null
+cms-backend  | Extracted JWT Token: null
+cms-backend  | JWT validation failed: Invalid compact JWT string: Compact JWSs must contain exactly 2 period characters, and compact JWEs must contain exactly 4.  Found: 0
+cms-backend  | Intercepted request: /api/companies
+cms-backend  | Authorization Header: Bearer null
+cms-backend  | Extracted JWT Token: null
+cms-backend  | JWT validation failed: Invalid compact JWT string: Compact JWSs must contain exactly 2 period characters, and compact JWEs must contain exactly 4.  Found: 0

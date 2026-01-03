@@ -1,0 +1,574 @@
+package se.meltastudio.cms.parts.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import se.meltastudio.cms.integration.common.SimpleTtlCache;
+import se.meltastudio.cms.model.Company;
+import se.meltastudio.cms.model.User;
+import se.meltastudio.cms.model.Vehicle;
+import se.meltastudio.cms.model.WorkOrder;
+import se.meltastudio.cms.parts.api.*;
+import se.meltastudio.cms.parts.domain.CustomerSupplierConfig;
+import se.meltastudio.cms.parts.domain.PartLineStatus;
+import se.meltastudio.cms.parts.domain.WorkOrderPartLine;
+import se.meltastudio.cms.parts.repository.CustomerSupplierConfigRepository;
+import se.meltastudio.cms.parts.repository.WorkOrderPartLineRepository;
+import se.meltastudio.cms.parts.supplier.SupplierAdapter;
+import se.meltastudio.cms.parts.supplier.SupplierAdapterRegistry;
+import se.meltastudio.cms.parts.supplier.SupplierException;
+import se.meltastudio.cms.repository.WorkOrderRepository;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
+/**
+ * Comprehensive unit tests for PartsService.
+ * Tests orchestration logic, supplier fallback, caching, security, and pricing.
+ */
+@ExtendWith(MockitoExtension.class)
+class PartsServiceTest {
+
+    @Mock
+    private SupplierAdapterRegistry adapterRegistry;
+
+    @Mock
+    private CustomerSupplierConfigRepository supplierConfigRepository;
+
+    @Mock
+    private WorkOrderPartLineRepository partLineRepository;
+
+    @Mock
+    private WorkOrderRepository workOrderRepository;
+
+    @Mock
+    private ObjectMapper objectMapper;
+
+    @Mock
+    private SimpleTtlCache<String, List<PartOffer>> searchCache;
+
+    @Mock
+    private SupplierMetrics metrics;
+
+    @InjectMocks
+    private PartsService partsService;
+
+    private Company company;
+    private VehicleContext vehicleContext;
+    private PartSearchQuery query;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        company = new Company();
+        company.setId(1L);
+        company.setName("Test Company");
+
+        vehicleContext = new VehicleContext();
+        vehicleContext.setMake("BMW");
+        vehicleContext.setModel("320d");
+        vehicleContext.setYear(2015);
+        vehicleContext.setRegistrationNumber("ABC123");
+
+        query = new PartSearchQuery("brake pads", null, 20);
+    }
+
+    @Test
+    throws Exception {
+    void searchParts_CacheHit_ShouldReturnCachedResults() throws Exception {
+        // Given
+        List<PartOffer> cachedResults = List.of(createPartOffer("PART-001", "Brake Pad"));
+        when(searchCache.get(any())).thenReturn(Optional.of(cachedResults));
+
+        // When
+        List<PartOffer> results = partsService.searchParts(company, vehicleContext, query);
+
+        // Then
+        assertEquals(cachedResults, results);
+        verify(metrics).recordCacheHit();
+        verify(supplierConfigRepository, never()).findEnabledSuppliersByCompanyOrderByPriority(any());
+    }
+
+    @Test
+    throws Exception {
+    void searchParts_CacheMiss_ShouldCallSupplier() throws Exception {
+        // Given
+        when(searchCache.get(any())).thenReturn(Optional.empty());
+
+        CustomerSupplierConfig config = createSupplierConfig("MOCK_SUPPLIER", 1, true);
+        when(supplierConfigRepository.findEnabledSuppliersByCompanyOrderByPriority(company))
+                .thenReturn(List.of(config));
+
+        SupplierAdapter adapter = mock(SupplierAdapter.class);
+        when(adapterRegistry.getAdapter("MOCK_SUPPLIER")).thenReturn(Optional.of(adapter));
+
+        List<PartOffer> supplierResults = List.of(createPartOffer("PART-001", "Brake Pad"));
+        when(adapter.searchParts(any(), any(), any())).thenReturn(supplierResults);
+
+        // When
+        List<PartOffer> results = partsService.searchParts(company, vehicleContext, query);
+
+        // Then
+        assertEquals(1, results.size());
+        assertEquals("PART-001", results.get(0).getSupplierPartId());
+        verify(metrics).recordCacheMiss();
+        verify(metrics).recordSupplierCall("MOCK_SUPPLIER");
+        verify(searchCache).put(any(), eq(supplierResults));
+    }
+
+    @Test
+    throws Exception {
+    void searchParts_SupplierFallback_ShouldTryNextSupplierOnFailure() throws Exception {
+        // Given
+        when(searchCache.get(any())).thenReturn(Optional.empty());
+
+        CustomerSupplierConfig config1 = createSupplierConfig("SUPPLIER_1", 1, true);
+        CustomerSupplierConfig config2 = createSupplierConfig("SUPPLIER_2", 2, true);
+        when(supplierConfigRepository.findEnabledSuppliersByCompanyOrderByPriority(company))
+                .thenReturn(List.of(config1, config2));
+
+        SupplierAdapter adapter1 = mock(SupplierAdapter.class);
+        SupplierAdapter adapter2 = mock(SupplierAdapter.class);
+        when(adapterRegistry.getAdapter("SUPPLIER_1")).thenReturn(Optional.of(adapter1));
+        when(adapterRegistry.getAdapter("SUPPLIER_2")).thenReturn(Optional.of(adapter2));
+
+        // First supplier throws exception
+        when(adapter1.searchParts(any(), any(), any())).thenThrow(new SupplierException("SUPPLIER_1", "Connection timeout"));
+
+        // Second supplier returns results
+        List<PartOffer> supplierResults = List.of(createPartOffer("PART-002", "Brake Disc"));
+        when(adapter2.searchParts(any(), any(), any())).thenReturn(supplierResults);
+
+        // When
+        List<PartOffer> results = partsService.searchParts(company, vehicleContext, query);
+
+        // Then
+        assertEquals(1, results.size());
+        assertEquals("PART-002", results.get(0).getSupplierPartId());
+        verify(metrics).recordSupplierFailure("SUPPLIER_1");
+        verify(metrics).recordSupplierCall("SUPPLIER_2");
+    }
+
+    @Test
+    throws Exception {
+    void searchParts_AllSuppliersFail_ShouldThrowException() throws Exception {
+        // Given
+        when(searchCache.get(any())).thenReturn(Optional.empty());
+
+        CustomerSupplierConfig config = createSupplierConfig("SUPPLIER_1", 1, true);
+        when(supplierConfigRepository.findEnabledSuppliersByCompanyOrderByPriority(company))
+                .thenReturn(List.of(config));
+
+        SupplierAdapter adapter = mock(SupplierAdapter.class);
+        when(adapterRegistry.getAdapter("SUPPLIER_1")).thenReturn(Optional.of(adapter));
+        when(adapter.searchParts(any(), any(), any())).thenThrow(new SupplierException("SUPPLIER_1", "API Error"));
+
+        // When & Then
+        assertThrows(PartsServiceException.class, () ->
+                partsService.searchParts(company, vehicleContext, query)
+        );
+
+        verify(metrics).recordSupplierFailure("SUPPLIER_1");
+    }
+
+    @Test
+    throws Exception {
+    void searchParts_NoEnabledSuppliers_ShouldReturnEmptyList() throws Exception {
+        // Given
+        when(searchCache.get(any())).thenReturn(Optional.empty());
+        when(supplierConfigRepository.findEnabledSuppliersByCompanyOrderByPriority(company))
+                .thenReturn(new ArrayList<>());
+
+        // When
+        List<PartOffer> results = partsService.searchParts(company, vehicleContext, query);
+
+        // Then
+        assertTrue(results.isEmpty());
+        verify(adapterRegistry, never()).getAdapter(any());
+    }
+
+    @Test
+    throws Exception {
+    void searchParts_FirstNonEmptyResult_ShouldStopSearching() throws Exception {
+        // Given - Strategy A from PRD: return first non-empty result
+        when(searchCache.get(any())).thenReturn(Optional.empty());
+
+        CustomerSupplierConfig config1 = createSupplierConfig("SUPPLIER_1", 1, true);
+        CustomerSupplierConfig config2 = createSupplierConfig("SUPPLIER_2", 2, true);
+        when(supplierConfigRepository.findEnabledSuppliersByCompanyOrderByPriority(company))
+                .thenReturn(List.of(config1, config2));
+
+        SupplierAdapter adapter1 = mock(SupplierAdapter.class);
+        SupplierAdapter adapter2 = mock(SupplierAdapter.class);
+        when(adapterRegistry.getAdapter("SUPPLIER_1")).thenReturn(Optional.of(adapter1));
+        when(adapterRegistry.getAdapter("SUPPLIER_2")).thenReturn(Optional.of(adapter2));
+
+        // First supplier returns results
+        List<PartOffer> supplierResults = List.of(createPartOffer("PART-001", "Brake Pad"));
+        when(adapter1.searchParts(any(), any(), any())).thenReturn(supplierResults);
+
+        // When
+        List<PartOffer> results = partsService.searchParts(company, vehicleContext, query);
+
+        // Then
+        assertEquals(1, results.size());
+        verify(adapter1).searchParts(any(), any(), any());
+        verify(adapter2, never()).searchParts(any(), any(), any()); // Should NOT call second supplier
+    }
+
+    @Test
+    throws Exception {
+    void addPartLine_ValidRequest_ShouldCreatePartLine() throws Exception {
+        // Given
+        Long workOrderId = 100L;
+        User user = createUser(1L, company);
+
+        WorkOrder workOrder = createWorkOrder(workOrderId, company);
+        when(workOrderRepository.findById(workOrderId)).thenReturn(Optional.of(workOrder));
+
+        AddPartLineRequest request = new AddPartLineRequest();
+        request.setSupplierCode("MOCK_SUPPLIER");
+        request.setSupplierPartId("PART-001");
+        request.setQuantity(2);
+
+        CustomerSupplierConfig config = createSupplierConfig("MOCK_SUPPLIER", 1, true);
+        when(supplierConfigRepository.findByCompanyAndSupplierCode(company, "MOCK_SUPPLIER"))
+                .thenReturn(Optional.of(config));
+
+        SupplierAdapter adapter = mock(SupplierAdapter.class);
+        when(adapterRegistry.getAdapter("MOCK_SUPPLIER")).thenReturn(Optional.of(adapter));
+
+        PartDetails partDetails = createPartDetails("PART-001", "Brake Pad", new BigDecimal("450.00"));
+        when(adapter.getPartDetails(any(), any(), eq("PART-001"))).thenReturn(partDetails);
+
+        when(objectMapper.writeValueAsString(any())).thenReturn("{\"mock\":\"json\"}");
+
+        WorkOrderPartLine savedPartLine = new WorkOrderPartLine();
+        savedPartLine.setId(1L);
+        when(partLineRepository.save(any())).thenReturn(savedPartLine);
+
+        // When
+        WorkOrderPartLine result = partsService.addPartLine(workOrderId, request, user);
+
+        // Then
+        assertNotNull(result);
+        verify(partLineRepository).save(any(WorkOrderPartLine.class));
+        verify(objectMapper).writeValueAsString(partDetails); // Snapshot saved
+    }
+
+    @Test
+    throws Exception {
+    void addPartLine_WrongCompany_ShouldThrowException() throws Exception {
+        // Given
+        Long workOrderId = 100L;
+        Company otherCompany = new Company();
+        otherCompany.setId(2L);
+        User user = createUser(1L, otherCompany);
+
+        WorkOrder workOrder = createWorkOrder(workOrderId, company); // Different company
+        when(workOrderRepository.findById(workOrderId)).thenReturn(Optional.of(workOrder));
+
+        AddPartLineRequest request = new AddPartLineRequest();
+        request.setSupplierCode("MOCK_SUPPLIER");
+        request.setSupplierPartId("PART-001");
+        request.setQuantity(1);
+
+        // When & Then
+        assertThrows(PartsServiceException.class, () ->
+                partsService.addPartLine(workOrderId, request, user)
+        );
+
+        verify(partLineRepository, never()).save(any());
+    }
+
+    @Test
+    throws Exception {
+    void addPartLine_WithPercentMarkup_ShouldCalculateCorrectly() throws Exception {
+        // Given
+        Long workOrderId = 100L;
+        User user = createUser(1L, company);
+
+        WorkOrder workOrder = createWorkOrder(workOrderId, company);
+        when(workOrderRepository.findById(workOrderId)).thenReturn(Optional.of(workOrder));
+
+        AddPartLineRequest request = new AddPartLineRequest();
+        request.setSupplierCode("MOCK_SUPPLIER");
+        request.setSupplierPartId("PART-001");
+        request.setQuantity(1);
+        request.setManualMarkupPercent(new BigDecimal("20")); // 20% markup
+
+        CustomerSupplierConfig config = createSupplierConfig("MOCK_SUPPLIER", 1, true);
+        when(supplierConfigRepository.findByCompanyAndSupplierCode(company, "MOCK_SUPPLIER"))
+                .thenReturn(Optional.of(config));
+
+        SupplierAdapter adapter = mock(SupplierAdapter.class);
+        when(adapterRegistry.getAdapter("MOCK_SUPPLIER")).thenReturn(Optional.of(adapter));
+
+        PartDetails partDetails = createPartDetails("PART-001", "Brake Pad", new BigDecimal("100.00"));
+        when(adapter.getPartDetails(any(), any(), eq("PART-001"))).thenReturn(partDetails);
+
+        when(objectMapper.writeValueAsString(any())).thenReturn("{\"mock\":\"json\"}");
+
+        WorkOrderPartLine capturedPartLine = new WorkOrderPartLine();
+        when(partLineRepository.save(any())).thenAnswer(invocation -> {
+            WorkOrderPartLine partLine = invocation.getArgument(0);
+            // Verify final price = 100 + (100 * 20/100) = 120
+            assertEquals(new BigDecimal("120.00"), partLine.getFinalUnitPriceExVat());
+            return partLine;
+        });
+
+        // When
+        partsService.addPartLine(workOrderId, request, user);
+
+        // Then - verified in mock answer above
+        verify(partLineRepository).save(any());
+    }
+
+    @Test
+    throws Exception {
+    void addPartLine_WithFixedMarkup_ShouldCalculateCorrectly() throws Exception {
+        // Given
+        Long workOrderId = 100L;
+        User user = createUser(1L, company);
+
+        WorkOrder workOrder = createWorkOrder(workOrderId, company);
+        when(workOrderRepository.findById(workOrderId)).thenReturn(Optional.of(workOrder));
+
+        AddPartLineRequest request = new AddPartLineRequest();
+        request.setSupplierCode("MOCK_SUPPLIER");
+        request.setSupplierPartId("PART-001");
+        request.setQuantity(1);
+        request.setManualMarkupFixed(new BigDecimal("50.00")); // Fixed 50 SEK markup
+
+        CustomerSupplierConfig config = createSupplierConfig("MOCK_SUPPLIER", 1, true);
+        when(supplierConfigRepository.findByCompanyAndSupplierCode(company, "MOCK_SUPPLIER"))
+                .thenReturn(Optional.of(config));
+
+        SupplierAdapter adapter = mock(SupplierAdapter.class);
+        when(adapterRegistry.getAdapter("MOCK_SUPPLIER")).thenReturn(Optional.of(adapter));
+
+        PartDetails partDetails = createPartDetails("PART-001", "Brake Pad", new BigDecimal("100.00"));
+        when(adapter.getPartDetails(any(), any(), eq("PART-001"))).thenReturn(partDetails);
+
+        when(objectMapper.writeValueAsString(any())).thenReturn("{\"mock\":\"json\"}");
+
+        when(partLineRepository.save(any())).thenAnswer(invocation -> {
+            WorkOrderPartLine partLine = invocation.getArgument(0);
+            // Verify final price = 100 + 50 = 150
+            assertEquals(new BigDecimal("150.00"), partLine.getFinalUnitPriceExVat());
+            return partLine;
+        });
+
+        // When
+        partsService.addPartLine(workOrderId, request, user);
+
+        // Then - verified in mock answer above
+        verify(partLineRepository).save(any());
+    }
+
+    @Test
+    throws Exception {
+    void placeOrder_ValidRequest_ShouldCreateOrder() throws Exception {
+        // Given
+        Long workOrderId = 100L;
+        Long partLineId = 10L;
+        User user = createUser(1L, company);
+
+        WorkOrderPartLine partLine = createPartLine(partLineId, workOrderId, company, "MOCK_SUPPLIER");
+        when(partLineRepository.findById(partLineId)).thenReturn(Optional.of(partLine));
+
+        CustomerSupplierConfig config = createSupplierConfig("MOCK_SUPPLIER", 1, true);
+        config.setOrderingEnabled(true);
+        when(supplierConfigRepository.findByCompanyAndSupplierCode(company, "MOCK_SUPPLIER"))
+                .thenReturn(Optional.of(config));
+
+        SupplierAdapter adapter = mock(SupplierAdapter.class);
+        when(adapterRegistry.getAdapter("MOCK_SUPPLIER")).thenReturn(Optional.of(adapter));
+        when(adapter.supportsOrdering()).thenReturn(true);
+
+        OrderResult orderResult = new OrderResult();
+        orderResult.setSuccess(true);
+        orderResult.setSupplierOrderReference("ORD-12345");
+        when(adapter.placeOrder(any(), any())).thenReturn(orderResult);
+
+        when(partLineRepository.save(any())).thenReturn(partLine);
+
+        // When
+        WorkOrderPartLine result = partsService.placeOrder(workOrderId, partLineId, user);
+
+        // Then
+        verify(partLineRepository).save(argThat(pl ->
+                pl.getStatus() == PartLineStatus.ORDERED &&
+                "ORD-12345".equals(pl.getSupplierOrderReference())
+        ));
+        verify(metrics).recordSupplierCall("MOCK_SUPPLIER");
+    }
+
+    @Test
+    throws Exception {
+    void placeOrder_AlreadyOrdered_ShouldThrowException() throws Exception {
+        // Given
+        Long workOrderId = 100L;
+        Long partLineId = 10L;
+        User user = createUser(1L, company);
+
+        WorkOrderPartLine partLine = createPartLine(partLineId, workOrderId, company, "MOCK_SUPPLIER");
+        partLine.setStatus(PartLineStatus.ORDERED); // Already ordered
+        when(partLineRepository.findById(partLineId)).thenReturn(Optional.of(partLine));
+
+        // When & Then
+        assertThrows(PartsServiceException.class, () ->
+                partsService.placeOrder(workOrderId, partLineId, user)
+        );
+
+        verify(partLineRepository, never()).save(any());
+    }
+
+    @Test
+    throws Exception {
+    void placeOrder_OrderingNotEnabled_ShouldThrowException() throws Exception {
+        // Given
+        Long workOrderId = 100L;
+        Long partLineId = 10L;
+        User user = createUser(1L, company);
+
+        WorkOrderPartLine partLine = createPartLine(partLineId, workOrderId, company, "MOCK_SUPPLIER");
+        when(partLineRepository.findById(partLineId)).thenReturn(Optional.of(partLine));
+
+        CustomerSupplierConfig config = createSupplierConfig("MOCK_SUPPLIER", 1, true);
+        config.setOrderingEnabled(false); // Ordering disabled
+        when(supplierConfigRepository.findByCompanyAndSupplierCode(company, "MOCK_SUPPLIER"))
+                .thenReturn(Optional.of(config));
+
+        // When & Then
+        assertThrows(PartsServiceException.class, () ->
+                partsService.placeOrder(workOrderId, partLineId, user)
+        );
+
+        verify(partLineRepository, never()).save(any());
+    }
+
+    @Test
+    throws Exception {
+    void getWorkOrderPartLines_ValidRequest_ShouldReturnPartLines() throws Exception {
+        // Given
+        Long workOrderId = 100L;
+        User user = createUser(1L, company);
+
+        WorkOrder workOrder = createWorkOrder(workOrderId, company);
+        when(workOrderRepository.findById(workOrderId)).thenReturn(Optional.of(workOrder));
+
+        List<WorkOrderPartLine> partLines = List.of(
+                createPartLine(1L, workOrderId, company, "SUPPLIER_1"),
+                createPartLine(2L, workOrderId, company, "SUPPLIER_2")
+        );
+        when(partLineRepository.findByWorkOrderOrderByCreatedAtDesc(workOrder)).thenReturn(partLines);
+
+        // When
+        List<WorkOrderPartLine> results = partsService.getWorkOrderPartLines(workOrderId, user);
+
+        // Then
+        assertEquals(2, results.size());
+    }
+
+    @Test
+    throws Exception {
+    void getWorkOrderPartLines_WrongCompany_ShouldThrowException() throws Exception {
+        // Given
+        Long workOrderId = 100L;
+        Company otherCompany = new Company();
+        otherCompany.setId(2L);
+        User user = createUser(1L, otherCompany);
+
+        WorkOrder workOrder = createWorkOrder(workOrderId, company); // Different company
+        when(workOrderRepository.findById(workOrderId)).thenReturn(Optional.of(workOrder));
+
+        // When & Then
+        assertThrows(PartsServiceException.class, () ->
+                partsService.getWorkOrderPartLines(workOrderId, user)
+        );
+    }
+
+    // Helper methods
+
+    private PartOffer createPartOffer(String partId, String name) {
+        PartOffer offer = new PartOffer();
+        offer.setSupplierCode("MOCK_SUPPLIER");
+        offer.setSupplierPartId(partId);
+        offer.setPartName(name);
+        offer.setUnitPriceExVat(new BigDecimal("450.00"));
+        offer.setVatRate(new BigDecimal("25"));
+        offer.setCurrency("SEK");
+        offer.setAvailabilityStatus("IN_STOCK");
+        offer.setDeliveryEstimateDays(1);
+        return offer;
+    }
+
+    private CustomerSupplierConfig createSupplierConfig(String code, int priority, boolean enabled) {
+        CustomerSupplierConfig config = new CustomerSupplierConfig();
+        config.setId(1L);
+        config.setCompany(company);
+        config.setSupplierCode(code);
+        config.setPriority(priority);
+        config.setEnabled(enabled);
+        return config;
+    }
+
+    private PartDetails createPartDetails(String partId, String name, BigDecimal price) {
+        PartDetails details = new PartDetails();
+        details.setSupplierCode("MOCK_SUPPLIER");
+        details.setSupplierPartId(partId);
+        details.setPartName(name);
+        details.setUnitPriceExVat(price);
+        details.setVatRate(new BigDecimal("25"));
+        details.setCurrency("SEK");
+        details.setAvailabilityStatus("IN_STOCK");
+        details.setDeliveryEstimateDays(1);
+        return details;
+    }
+
+    private User createUser(Long id, Company company) {
+        User user = new User();
+        user.setId(id);
+        user.setCompany(company);
+        user.setUsername("test@example.com");
+        return user;
+    }
+
+    private WorkOrder createWorkOrder(Long id, Company company) {
+        WorkOrder wo = mock(WorkOrder.class);
+        Vehicle vehicle = mock(Vehicle.class);
+        se.meltastudio.cms.model.Workplace workplace = mock(se.meltastudio.cms.model.Workplace.class);
+
+        when(wo.getId()).thenReturn(id);
+        when(wo.getVehicle()).thenReturn(vehicle);
+        when(vehicle.getWorkplace()).thenReturn(workplace);
+        when(workplace.getCompany()).thenReturn(company);
+
+        return wo;
+    }
+
+    private WorkOrderPartLine createPartLine(Long id, Long workOrderId, Company company, String supplierCode) {
+        WorkOrderPartLine partLine = new WorkOrderPartLine();
+        partLine.setId(id);
+        partLine.setSupplierCode(supplierCode);
+        partLine.setSupplierPartId("PART-001");
+        partLine.setQuantity(1);
+        partLine.setStatus(PartLineStatus.PLANNED);
+
+        WorkOrder workOrder = createWorkOrder(workOrderId, company);
+        partLine.setWorkOrder(workOrder);
+
+        return partLine;
+    }
+}

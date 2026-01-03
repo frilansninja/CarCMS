@@ -1,0 +1,94 @@
+import axios from "axios";
+
+const API_URL = "http://localhost:8080/api";
+const CUSTOMER_API_URL = `${API_URL}/customers`;
+const USER_API_URL = `${API_URL}/users`;
+
+// Skapa en axios-instans som automatiskt skickar JWT-token
+const api = axios.create({
+    baseURL: API_URL,
+});
+
+// Interceptor för att lägga till token i varje förfrågan
+api.interceptors.request.use(async (config) => {
+    let token = localStorage.getItem("accessToken"); // 🔹 Använd samma nyckel överallt!
+
+    if (token) {
+        const expiration = JSON.parse(atob(token.split(".")[1])).exp * 1000;
+        if (Date.now() >= expiration) {
+            token = await refreshToken();
+        }
+        console.log("Lägger till token i förfrågan:", token); // ✅ Debug-logg
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
+api.interceptors.response.use(
+    response => response,
+    error => {
+        if (error.response && error.response.status === 401) {
+            console.error("Token ogiltig eller utgången. Loggar ut användaren...");
+            logout(); // 🔹 Använd den gemensamma logout-funktionen
+        }
+        return Promise.reject(error);
+    }
+);
+
+// Funktion för att förnya token
+const refreshToken = async () => {
+    try {
+        const refreshToken = localStorage.getItem("refreshToken");
+
+        if (!refreshToken) {
+            console.error("Ingen refreshToken hittades, loggar ut...");
+            logout();
+            return null;
+        }
+
+        const response = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+
+        localStorage.setItem("accessToken", response.data.accessToken);
+        return response.data.accessToken;
+    } catch (error) {
+        console.error("Failed to refresh token:", error);
+        logout();
+        return null;
+    }
+};
+
+// Funktion för att logga ut användaren
+const logout = () => {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    window.location.href = "/login";
+};
+
+
+
+// API-funktioner
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Exportera logout-funktion
+export { logout };
+
+
+
