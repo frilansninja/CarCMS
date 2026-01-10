@@ -53,7 +53,24 @@ public class CompanyController {
 
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'CUSTOMER_ADMIN', 'WORKPLACE_ADMIN')")
     @PostMapping
-    public ResponseEntity<CompanyDTO> addCompany(@RequestBody Company company) {
+    public ResponseEntity<CompanyDTO> addCompany(@RequestBody CompanyDTO companyDTO) {
+        // Konvertera DTO till entitet
+        Company company = new Company();
+        company.setName(companyDTO.getName());
+        company.setOrgNumber(companyDTO.getOrgNumber());
+        company.setPhone(companyDTO.getPhone());
+        company.setEmail(companyDTO.getEmail());
+        company.setAddress(companyDTO.getAddress());
+        company.setBankgiro(companyDTO.getBankgiro());
+        company.setPlusgiro(companyDTO.getPlusgiro());
+        company.setVatNumber(companyDTO.getVatNumber());
+        company.setPaymentTerms(companyDTO.getPaymentTerms());
+        company.setGln(companyDTO.getGln());
+        company.setBillingStreet(companyDTO.getBillingStreet());
+        company.setBillingCity(companyDTO.getBillingCity());
+        company.setBillingZip(companyDTO.getBillingZip());
+        company.setBillingCountry(companyDTO.getBillingCountry());
+
         Company savedCompany = companyService.saveCompany(company);
         return ResponseEntity.ok(companyService.toDTO(savedCompany));
     }

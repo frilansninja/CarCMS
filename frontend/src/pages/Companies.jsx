@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchCompanies } from "../api/companies";
+import { fetchCompanies, deleteCompany } from "../api/companies";
 import CompanyTable from "../components/CompanyTable";
 import AddCompanyForm from "../components/AddCompanyForm";
 import { Typography, Box, Button, Dialog, DialogTitle, DialogContent } from "@mui/material";
@@ -31,6 +31,17 @@ const Companies = () => {
         setOpenDialog(false);
     };
 
+    const handleShowUsers = (companyId) => {
+        navigate(`/admin/companies/${companyId}/users`);
+    };
+
+    const handleDeleteCompany = async (companyId) => {
+        if (window.confirm('Är du säker på att du vill ta bort detta företag?')) {
+            await deleteCompany(companyId);
+            loadCompanies();
+        }
+    };
+
     return (
         <Box>
             <Box sx={{ textAlign: 'center', mb: 4 }}>
@@ -50,6 +61,8 @@ const Companies = () => {
 
             <CompanyTable
                 companies={companies}
+                onShowUsers={handleShowUsers}
+                onDelete={handleDeleteCompany}
             />
 
             <Dialog

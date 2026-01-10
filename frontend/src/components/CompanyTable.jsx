@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import { Settings, Edit, Trash2, Users } from 'react-feather';
 
-const CompanyTable = ({ companies }) => {
+const CompanyTable = ({ companies, onShowUsers, onDelete }) => {
     const navigate = useNavigate();
 
     return (

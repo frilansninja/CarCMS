@@ -253,6 +253,14 @@ function App() {
                                             </ProtectedRoute>
                                         }
                                     />
+                                    <Route
+                                        path="/admin/companies/:companyId/users"
+                                        element={
+                                            <ProtectedRoute>
+                                                <UserPage />
+                                            </ProtectedRoute>
+                                        }
+                                    />
                                 </>
                             )}
 

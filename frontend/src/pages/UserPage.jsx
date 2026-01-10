@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
 import { Container, Paper, Typography, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, MenuItem, Select, CircularProgress, Box, Button, TableSortLabel } from "@mui/material";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { fetchCompanies } from "../api/companies";
 
 const UserPage = () => {
     const navigate = useNavigate();
+    const { companyId: urlCompanyId } = useParams();
     const [users, setUsers] = useState([]);
     const [companies, setCompanies] = useState([]);
     const [workplaces, setWorkplaces] = useState([]);
     const [searchTerm, setSearchTerm] = useState(localStorage.getItem("searchTerm") || "");
     const [roleFilter, setRoleFilter] = useState(localStorage.getItem("roleFilter") || "");
-    const [companyFilter, setCompanyFilter] = useState(localStorage.getItem("companyFilter") || "");
+    const [companyFilter, setCompanyFilter] = useState(urlCompanyId || localStorage.getItem("companyFilter") || "");
     const [workplaceFilter, setWorkplaceFilter] = useState(localStorage.getItem("workplaceFilter") || "");
     const [page, setPage] = useState(parseInt(localStorage.getItem("page"), 10) || 0);
     const [rowsPerPage, setRowsPerPage] = useState(parseInt(localStorage.getItem("rowsPerPage"), 10) || 10);
@@ -19,6 +20,13 @@ const UserPage = () => {
     const [sortOrder, setSortOrder] = useState("asc"); // 🔹 Hantera sortering av namn
     const userRoles = JSON.parse(localStorage.getItem("userRoles") || "[]");
     const isSuperAdmin = userRoles.includes("SUPER_ADMIN");
+
+    // Om vi kommer från en företagssida, sätt filtret
+    useEffect(() => {
+        if (urlCompanyId) {
+            setCompanyFilter(urlCompanyId);
+        }
+    }, [urlCompanyId]);
 
     useEffect(() => {
         if (isSuperAdmin) {
